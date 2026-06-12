@@ -1,0 +1,73 @@
+{
+  "properties": {
+    "displayName": "Enforce Mandatory Tags and Allowed Values",
+    "policyType": "Custom",
+    "mode": "Indexed",
+    "description": "Enforces presence of Environment, Owner, CostCenter, Application, and DataClassification tags on resources. Restricts Environment to [Prod, Stage, Dev, Test] and DataClassification to [Public, Internal, Confidential, Restricted].",
+    "metadata": {
+      "category": "Tags"
+    },
+    "parameters": {
+      "effect": {
+        "type": "String",
+        "metadata": {
+          "displayName": "Policy Effect",
+          "description": "Enable or disable the execution of the policy. Use 'Audit' for testing or 'Deny' to enforce compliance strictly."
+        },
+        "allowedValues": [
+          "Audit",
+          "Deny",
+          "Disabled"
+        ],
+        "defaultValue": "Deny"
+      }
+    },
+    "policyRule": {
+      "if": {
+        "anyOf": [
+          {
+            "field": "tags['Environment']",
+            "exists": "false"
+          },
+          {
+            "field": "tags['Environment']",
+            "notIn": [
+              "Prod",
+              "Stage",
+              "Dev",
+              "Test"
+            ]
+          },
+          {
+            "field": "tags['Owner']",
+            "exists": "false"
+          },
+          {
+            "field": "tags['CostCenter']",
+            "exists": "false"
+          },
+          {
+            "field": "tags['Application']",
+            "exists": "false"
+          },
+          {
+            "field": "tags['DataClassification']",
+            "exists": "false"
+          },
+          {
+            "field": "tags['DataClassification']",
+            "notIn": [
+              "Public",
+              "Internal",
+              "Confidential",
+              "Restricted"
+            ]
+          }
+        ]
+      },
+      "then": {
+        "effect": "[parameters('effect')]"
+      }
+    }
+  }
+}
