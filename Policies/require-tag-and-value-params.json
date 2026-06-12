@@ -1,0 +1,15 @@
+{
+  "effect": {
+    "type": "String",
+    "metadata": {
+      "displayName": "Policy Effect",
+      "description": "Enable or disable the execution of the policy. Use 'Audit' for testing or 'Deny' to enforce compliance strictly."
+    },
+    "allowedValues": [
+      "Audit",
+      "Deny",
+      "Disabled"
+    ],
+    "defaultValue": "Deny"
+  }
+}
