@@ -1,12 +1,12 @@
-# Azure Resource Governance Verification Report
+# Tag Compliance Audit — Azure Resource Graph Report
 
-This report documents the verification of resource compliance using Azure Resource Graph. It contains the query used to verify resource metadata and a list of tagged resources filtered by the `Environment` and `CostCenter` tags.
+This report covers the process of checking resource compliance through Azure Resource Graph. It includes the query used to audit resource metadata, along with the resulting list of tagged resources filtered against the `Environment` and `CostCenter` tags.
 
 ---
 
-## 1. Verification Query
+## 1. Audit Query Used
 
-The following Kusto Query Language (KQL) query was executed in the **Azure Resource Graph Explorer** to audit compliance:
+The Kusto Query Language (KQL) query below was run inside **Azure Resource Graph Explorer** to check compliance across the subscription:
 
 ```kql
 resources
@@ -24,9 +24,9 @@ resources
 
 ---
 
-## 2. Query Results (Verification List)
+## 2. Resources Found in Scope
 
-Below is the list of tagged resources active in the Azure subscription scope, retrieved directly via Azure Resource Graph.
+The table below lists the tagged resources found within scope, pulled directly from Azure Resource Graph:
 
 | Resource Name | Resource Type | Resource Group | Environment | CostCenter | Owner | Application | DataClassification |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -34,18 +34,17 @@ Below is the list of tagged resources active in the Azure subscription scope, re
 
 ---
 
-## 3. Compliance Summary
+## 3. Results Snapshot
 
-*   **Total Checked Resources**: 1
-*   **Compliant Resources (All Mandatory Tags Present)**: 1
-*   **Non-Compliant Resources**: 0
-*   **Compliance Status**: 100%
+*   **Resources Reviewed**: 1
+*   **Fully Compliant (all required tags present)**: 1
+*   **Out of Compliance**: 0
+*   **Overall Compliance Rate**: 100%
 
-### Findings & Observations
-
-1.  **Tag Completeness**: All verified resources contain the mandatory 5 tags: `Environment`, `Owner`, `CostCenter`, `Application`, and `DataClassification`.
-2.  **Tag Value Alignment**: Value validations check out:
-    *   `Environment` values are correctly set to `Dev` or `Prod`.
-    *   `DataClassification` is restricted to `Internal`, `Confidential`, or `Restricted`.
-    *   `CostCenter` patterns follow the `CC-XXXX` format.
-3.  **Governance Health**: The combination of proactive policies (`Deny` effect on new creations) and reactive audits (KQL query validation) successfully maintains zero configuration drift.
+### Key Takeaways
+1.  **Tags Present**: Every resource checked carries all five required tags — `Environment`, `Owner`, `CostCenter`, `Application`, and `DataClassification`.
+2.  **Tag Values Match Expectations**: The values themselves hold up under validation:
+    *   `Environment` is correctly populated with either `Dev` or `Prod`
+    *   `DataClassification` sticks to one of `Internal`, `Confidential`, or `Restricted`
+    *   `CostCenter` follows the expected `CC-XXXX` naming pattern
+3.  **Overall Governance Posture**: Pairing the preventative policy (which denies non-compliant resource creation) with this periodic audit query has kept configuration drift at zero so far.
