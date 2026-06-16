@@ -1,46 +1,46 @@
-# Azure Tagging Schema and Governance Framework
+# Azure Resource Tagging Standards
 
-This document outlines the standardized resource tagging schema designed for the Azure cloud environment. Implementing this framework ensures cost transparency, operational accountability, and security alignment across all business units.
+This document lays out the standardized tagging approach adopted for resources across the Azure environment. Putting this framework into practice gives the organization clearer cost visibility, accountability over who owns what, and consistent alignment with security expectations across every business unit.
 
 ---
 
-## Tagging Schema Overview
+## How the Tags Are Organized
 
-The following tags are classified into **Mandatory** (enforced by Azure Policy) and **Optional** (highly recommended for additional context).
+Tags fall into two buckets: **Mandatory** (enforced through Azure Policy) and **Optional** (encouraged, but not policed).
 
 ### 1. Mandatory Tags
 
-These tags must be present on all resources. Azure Policy will reject deployments that lack any of these tags or contain invalid values.
+Every resource needs all of these present. Azure Policy will block any deployment that's missing one of them or uses a value outside the allowed list.
 
-| Tag Key | Expected Value Format / Allowed Values | Stakeholder | Purpose & Justification |
+| Tag Key | Expected Value Format / Allowed Values | Stakeholder | Why It Exists |
 | :--- | :--- | :--- | :--- |
-| **Environment** | `Prod`, `Stage`, `Dev`, `Test` | IT / Ops | Distinguishes workloads by environment type. Prevents non-production resources from inheriting production policies and flags environments for cost optimization during non-business hours. |
-| **Owner** | Email address (e.g., `user@company.com` or distribution group) | IT / Management | Identifies the primary contact or team responsible for the resource. Used for automated alerting, security incident response, and ownership handoff. |
-| **CostCenter** | `CC-` followed by a 4-digit code (e.g., `CC-1001`, `CC-2002`) | Finance | Maps resource costs back to specific business units for budgeting, financial reporting, and chargeback/showback. |
-| **Application** | Alphanumeric string, no spaces (e.g., `CustomerPortal`, `InventoryAPI`) | IT / Dev | Groups resources logically under their parent workload or service. Essential for understanding architecture dependencies. |
-| **DataClassification** | `Public`, `Internal`, `Confidential`, `Restricted` | Security | Categorizes the sensitivity of the data handled by the resource. Guides automated security monitoring and compliance audits. |
+| **Environment** | `Prod`, `Stage`, `Dev`, `Test` | IT / Ops | Separates workloads by environment so non-production resources don't accidentally pick up production-grade policies, and makes it easy to flag non-prod environments for cost savings outside business hours. |
+| **Owner** | Email address (e.g., `user@company.com` or a distribution group) | IT / Management | Points to the person or team accountable for the resource — used when sending automated alerts, responding to security incidents, or handing off ownership. |
+| **CostCenter** | `CC-` followed by a 4-digit code (e.g., `CC-1001`, `CC-2002`) | Finance | Ties resource spend back to the right business unit for budgeting, reporting, and internal chargeback/showback. |
+| **Application** | Alphanumeric, no spaces (e.g., `CustomerPortal`, `InventoryAPI`) | IT / Dev | Groups resources under the workload or service they belong to — important for tracing architecture dependencies. |
+| **DataClassification** | `Public`, `Internal`, `Confidential`, `Restricted` | Security | Flags how sensitive the data on that resource is, feeding into automated security monitoring and compliance checks. |
 
 ### 2. Optional Tags
 
-These tags provide extra context and metadata but are not programmatically enforced by policy.
+These add useful context but aren't checked or enforced by any policy.
 
-| Tag Key | Expected Value Format | Stakeholder | Purpose & Justification |
+| Tag Key | Expected Value Format | Stakeholder | Why It Exists |
 | :--- | :--- | :--- | :--- |
-| **ProvisioningDate** | Date in `YYYY-MM-DD` format | IT / Ops | Documents when the resource was created. Helps identify stale resources for decommissioning. |
-| **CreatedBy** | Email or automation service principal name | IT / Security | Identifies the creator (e.g., `Terraform-SPN` or `admin@company.com`) to trace deployment origin. |
+| **ProvisioningDate** | Date in `YYYY-MM-DD` format | IT / Ops | Records when a resource was first created — useful for spotting stale resources worth decommissioning. |
+| **CreatedBy** | Email address or automation service principal name | IT / Security | Notes who or what created the resource (e.g., `Terraform-SPN` or `admin@company.com`), helpful for tracing deployment history. |
 
 ---
 
-## Tagging Conventions & Standards
+## Conventions Worth Knowing
 
-1.  **Case Sensitivity**: Tag keys and values in Azure are case-sensitive. The keys must exactly match the casing defined above (e.g., `CostCenter`, not `costcenter` or `COSTCENTER`).
-2.  **Allowed Characters**: Keys and values must only contain alphanumeric characters, hyphens (`-`), and underscores (`_`). Spaces are discouraged to maintain compatibility with automation scripts.
-3.  **Scope**: Tags applied to a resource group are **not** automatically inherited by resources within that group. Therefore, we use Azure Policy to enforce tags directly at the resource level.
+1.  **Case matters**: Azure treats tag keys and values as case-sensitive. Keys must match the exact casing shown above — `CostCenter`, not `costcenter` or `COSTCENTER`.
+2.  **Character limits**: Stick to alphanumeric characters, hyphens (`-`), and underscores (`_`) in both keys and values. Avoid spaces, since they tend to cause friction with automation scripts.
+3.  **No inheritance**: Tags set at the resource group level don't automatically carry down to the resources inside it. That's exactly why Azure Policy is used to enforce tagging directly at the resource level, rather than relying on inheritance.
 
 ---
 
-## Stakeholder Benefits
+## Why Each Team Benefits
 
-*   **Finance (Cost Allocation)**: By filtering reports in Microsoft Cost Management by `CostCenter`, finance teams can perform accurate chargebacks.
-*   **Security (Access Control & Audits)**: Security teams can write conditional policies based on the `DataClassification` tag (e.g., enforcing tighter Network Security Group rules on `Confidential` or `Restricted` resources).
-*   **Operations (Resource Management)**: Automated scripts can schedule start/stop routines on resources tagged `Environment: Dev` or `Environment: Test` to save costs when not in use.
+*   **Finance — Cost Allocation**: Filtering Microsoft Cost Management reports by `CostCenter` lets finance run accurate chargebacks per business unit.
+*   **Security — Access Control & Audits**: The `DataClassification` tag lets security teams write conditional rules — for example, applying stricter Network Security Group settings to anything tagged `Confidential` or `Restricted`.
+*   **Operations — Resource Management**: Automation can target resources tagged `Environment: Dev` or `Environment: Test` to start/stop them on a schedule, cutting costs when they're not actively needed.
