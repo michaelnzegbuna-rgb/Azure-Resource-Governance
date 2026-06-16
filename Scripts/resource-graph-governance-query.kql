@@ -1,0 +1,20 @@
+// Azure Resource Graph Query: Surface Resources by Governance Tags
+// This query pulls every taggable resource that has either an 'Environment' or 'CostCenter'
+// tag set, breaking those tags out into their own columns so they're easy to report on and sort.
+//
+// How to use it:
+// 1. Head to the Azure Portal.
+// 2. Search for "Resource Graph Explorer".
+// 3. Drop this query in and click "Run query".
+// 4. Export the output to CSV, or convert it into a Markdown table.
+resources
+| project name, type, tags, resourceGroup, subscriptionId
+| where isnotnull(tags)
+| extend Environment = tostring(tags['Environment']),
+         CostCenter = tostring(tags['CostCenter']),
+         Owner = tostring(tags['Owner']),
+         Application = tostring(tags['Application']),
+         DataClassification = tostring(tags['DataClassification'])
+| project name, type, resourceGroup, Environment, CostCenter, Owner, Application, DataClassification
+| where isnotempty(CostCenter) or isnotempty(Environment)
+| order by Environment desc, CostCenter asc, name asc
