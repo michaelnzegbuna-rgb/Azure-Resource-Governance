@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# SYNOPSIS: Applies the mandatory tagging schema to existing resources in a Resource Group using Azure CLI.
+# SYNOPSIS: Walks through resources in a Resource Group and applies the required tagging schema, via the Azure CLI.
 # USAGE: ./apply-tags.sh -g <ResourceGroupName> [optional parameters]
 # EXAMPLE: ./apply-tags.sh -g rg-governance-demo -o "operations@company.com"
 
@@ -16,12 +16,12 @@ DATA_CLASS="Internal"
 
 print_usage() {
     echo "Usage: ./apply-tags.sh -g <ResourceGroupName> [options]"
-    echo "  -g : Resource Group name (Required)"
-    echo "  -v : Environment (default: Dev)"
-    echo "  -o : Owner email (default: admin@company.com)"
-    echo "  -c : CostCenter (default: CC-1001)"
-    echo "  -a : Application (default: LegacyApp)"
-    echo "  -d : DataClassification (default: Internal)"
+    echo "  -g : Resource Group name (mandatory)"
+    echo "  -v : Environment tag value (Dev by default)"
+    echo "  -o : Owner tag value (admin@company.com by default)"
+    echo "  -c : CostCenter tag value (CC-1001 by default)"
+    echo "  -a : Application tag value (LegacyApp by default)"
+    echo "  -d : DataClassification tag value (Internal by default)"
 }
 
 while getopts "g:v:o:c:a:d:h" opt; do
@@ -38,33 +38,32 @@ while getopts "g:v:o:c:a:d:h" opt; do
 done
 
 if [ -z "$RG_NAME" ]; then
-    echo "Error: Resource Group Name (-g) is required."
+    echo "Error: you must supply a Resource Group name via -g."
     print_usage
     exit 1
 fi
 
-# Ensure logged in
+# Make sure we're authenticated against Azure
 if ! az account show &> /dev/null; then
-    echo "Error: Not logged in to Azure. Please run 'az login' first."
+    echo "Error: not currently signed in to Azure. Run 'az login' first."
     exit 1
 fi
 
-echo "Validating Resource Group '$RG_NAME'..."
+echo "Checking that Resource Group '$RG_NAME' actually exists..."
 if ! az group show --name "$RG_NAME" &> /dev/null; then
-    echo "Error: Resource Group '$RG_NAME' does not exist."
+    echo "Error: no Resource Group named '$RG_NAME' was found."
     exit 1
 fi
 
-echo "Fetching resources in Resource Group '$RG_NAME'..."
-# Fetch resources, query returns a JSON array of objects with id, name, type, tags
+echo "Retrieving the resource inventory for '$RG_NAME'..."
+# Returns a JSON array of objects, each with id, name, type, tags
 resources=$(az resource list --resource-group "$RG_NAME" --query "[].{id:id, name:name, type:type, tags:tags}" -o json)
 
 count=$(echo "$resources" | jq '. | length' 2>/dev/null || echo "0")
-# If jq is not installed, we can use python or grep, but jq is standard. Let's make it robust.
-# Let's check if jq is installed. If not, use Python to count and process.
+# Prefer jq for parsing, but degrade gracefully to Python if jq isn't installed
 use_python=false
 if ! command -v jq &> /dev/null; then
-    echo "jq command not found. Using fallback Python parser..."
+    echo "jq not detected on this system — falling back to the Python-based path..."
     use_python=true
 fi
 
@@ -77,13 +76,13 @@ process_resource() {
     echo "--------------------------------------------------"
     echo "Resource: $name [$type]"
     
-    # Check current tags
-    echo "Current Tags JSON: $tags_json"
+    # Display the tags already attached to this resource
+    echo "Tags currently on record: $tags_json"
 
-    # We want to build tags to apply
+    # Holds any tags that still need adding
     local tags_to_apply=""
 
-    # Helper to check if tag key exists in JSON
+    # Tests for the presence of a single tag key
     check_and_add_tag() {
         local key=$1
         local val=$2
@@ -96,7 +95,7 @@ process_resource() {
         fi
 
         if [ "$exists" != "true" ]; then
-            echo "  [Missing Tag] Adding default '$key' = '$val'"
+            echo "  [Not set] Will add '$key' = '$val'"
             tags_to_apply="$tags_to_apply $key=$val"
         fi
     }
@@ -108,29 +107,27 @@ process_resource() {
     check_and_add_tag "DataClassification" "$DATA_CLASS"
 
     if [ ! -z "$tags_to_apply" ]; then
-        echo "  Applying missing tags using merge..."
+        echo "  Pushing the missing tags through a merge operation..."
         az resource tag --ids "$id" --tags $tags_to_apply --operation Merge > /dev/null
-        echo "  Tags updated successfully!"
+        echo "  Done — tags are now in place."
     else
-        echo "  Resource is already compliant with mandatory tag presence rules."
+        echo "  Nothing to do here — all mandatory tags are already set."
     fi
 }
 
 if [ "$use_python" = true ]; then
-    # Python fallback to iterate and process
+    # First attempt: drive the iteration through Python
     python -c '
 import sys, json, subprocess
 res_list = json.loads(sys.argv[1])
-print(f"Found {len(res_list)} resource(s). Checking compliance...")
+print(f"Found {len(res_list)} resource(s). Working through compliance checks...")
 for r in res_list:
     tags_str = json.dumps(r.get("tags") or {})
     subprocess.run(["bash", "-c", f"source ./apply-tags.sh -h &>/dev/null; process_resource_python"], env={"id": r["id"], "name": r["name"], "type": r["type"], "tags": tags_str})
 ' "$resources" 2>/dev/null || true
     
-    # Let's write a simple pure bash loop as a secondary fallback if python fails or we want a simpler solution.
-    # Actually, a simple bash solution is to query ids and loop. Let's do that! It is much simpler and more robust.
+    # Fallback: a self-contained bash loop that doesn't depend on Python at all
     
-    # Let's rewrite the iteration in pure bash using `az` queries to be 100% robust without python.
     ids=$(az resource list --resource-group "$RG_NAME" --query "[].id" -o tsv)
     for id in $ids; do
         name=$(az resource show --id "$id" --query "name" -o tsv)
@@ -142,7 +139,7 @@ for r in res_list:
         process_resource "$id" "$name" "$type" "$tags_json"
     done
 else
-    # Loop using jq
+    # Standard path: parse with jq
     for row in $(echo "$resources" | jq -r '.[] | @base64'); do
         _jq() {
             echo ${row} | base64 --decode | jq -r ${1}
@@ -159,4 +156,4 @@ else
 fi
 
 echo "--------------------------------------------------"
-echo "Tagging process completed."
+echo "All resources have been processed."
