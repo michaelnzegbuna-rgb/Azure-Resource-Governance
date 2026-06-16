@@ -1,22 +1,22 @@
 <#
 .SYNOPSIS
-    Applies the mandatory tagging schema to existing resources in a Resource Group using Azure CLI (az).
+    Applies the mandatory tagging schema across existing resources in a Resource Group, using the Azure CLI (az).
 .DESCRIPTION
-    This script is designed for Windows environments where Azure CLI (az) is installed, but the
-    Azure PowerShell module (Az) is not. It scans a resource group, checks each resource for 
-    compliance, and uses 'az resource tag --operation Merge' to append missing mandatory tags.
+    Built for Windows environments that have Azure CLI installed but not the Azure PowerShell (Az)
+    module, this script walks through a resource group, checks each resource for missing mandatory
+    tags, and uses 'az resource tag --operation Merge' to fill in whatever is absent.
 .PARAMETER ResourceGroupName
-    The name of the Resource Group containing resources to tag.
+    Resource Group whose resources need tagging.
 .PARAMETER Environment
-    Default tag value for Environment (default: 'Dev').
+    Fallback value for the Environment tag (defaults to 'Dev').
 .PARAMETER Owner
-    Default tag value for Owner (default: 'admin@company.com').
+    Fallback value for the Owner tag (defaults to 'admin@company.com').
 .PARAMETER CostCenter
-    Default tag value for CostCenter (default: 'CC-1001').
+    Fallback value for the CostCenter tag (defaults to 'CC-1001').
 .PARAMETER Application
-    Default tag value for Application (default: 'LegacyApp').
+    Fallback value for the Application tag (defaults to 'LegacyApp').
 .PARAMETER DataClassification
-    Default tag value for DataClassification (default: 'Internal').
+    Fallback value for the DataClassification tag (defaults to 'Internal').
 .EXAMPLE
     .\apply-tags-az.ps1 -ResourceGroupName "rg-governance-demo" -Owner "dev-team@company.com"
 #>
@@ -39,35 +39,35 @@ param (
     [string]$DataClassification = "Internal"
 )
 
-# Check if az CLI is available
+# Confirm Azure CLI is installed
 $azCheck = Get-Command az -ErrorAction SilentlyContinue
 if ($null -eq $azCheck) {
-    Write-Error "Azure CLI (az) is not installed or not in the PATH. Please install it first."
+    Write-Error "Azure CLI (az) was not found. Install it and make sure it's available on PATH."
     exit 1
 }
 
-# Verify login status
-Write-Host "Verifying Azure CLI login status..." -ForegroundColor Cyan
+# Confirm an active Azure session exists
+Write-Host "Checking current Azure CLI session..." -ForegroundColor Cyan
 $account = az account show --output json | ConvertFrom-Json -ErrorAction SilentlyContinue
 if ($null -eq $account) {
-    Write-Error "Not logged in to Azure CLI. Please run 'az login' first."
+    Write-Error "No active Azure session detected. Run 'az login' before retrying."
     exit 1
 }
 
-Write-Host "Fetching resources in Resource Group '$ResourceGroupName'..." -ForegroundColor Cyan
+Write-Host "Pulling resource list for Resource Group '$ResourceGroupName'..." -ForegroundColor Cyan
 $resourcesRaw = az resource list --resource-group $ResourceGroupName --output json
 if ($null -eq $resourcesRaw -or $resourcesRaw -eq "") {
-    Write-Host "No resources found or Resource Group '$ResourceGroupName' does not exist." -ForegroundColor Yellow
+    Write-Host "Nothing came back — either the Resource Group '$ResourceGroupName' doesn't exist or it's empty." -ForegroundColor Yellow
     exit 0
 }
 
 $resources = $resourcesRaw | ConvertFrom-Json
 if ($resources.Count -eq 0 -or $null -eq $resources) {
-    Write-Host "No resources found in Resource Group '$ResourceGroupName'." -ForegroundColor Yellow
+    Write-Host "Resource Group '$ResourceGroupName' has no resources to tag." -ForegroundColor Yellow
     exit 0
 }
 
-Write-Host "Found $($resources.Count) resource(s). Checking compliance and applying tags..." -ForegroundColor Cyan
+Write-Host "Found $($resources.Count) resource(s). Reviewing compliance and applying tags where needed..." -ForegroundColor Cyan
 
 $defaultTags = [ordered]@{
     "Environment"        = $Environment
@@ -81,20 +81,20 @@ foreach ($resource in $resources) {
     Write-Host "--------------------------------------------------" -ForegroundColor Gray
     Write-Host "Resource: $($resource.name) [$($resource.type)]" -ForegroundColor White
     
-    # Get current tags
+    # Pull existing tags
     $currentTags = $resource.tags
     if ($null -eq $currentTags) {
         $currentTags = [PSCustomObject]@{}
     }
     
-    # Check current tags count
+    # Show what's already there
     $tagKeys = $currentTags | Get-Member -MemberType NoteProperty | Select-Object -ExpandProperty Name
-    Write-Host "Current Tags: $($tagKeys.Count) tag(s) found." -ForegroundColor Gray
+    Write-Host "Existing tags: $($tagKeys.Count) found." -ForegroundColor Gray
     foreach ($key in $tagKeys) {
         Write-Host "  $key = $($currentTags.$key)" -ForegroundColor DarkGray
     }
 
-    # Identify missing tags
+    # Work out which mandatory tags are absent
     $tagsToApply = @()
     $needsUpdate = $false
 
@@ -105,29 +105,29 @@ foreach ($resource in $resources) {
         }
 
         if (-not $hasTag) {
-            Write-Host "  [Missing Tag] Will add default '$tagKey' = '$($defaultTags[$tagKey])'" -ForegroundColor Yellow
+            Write-Host "  [Tag absent] Applying default '$tagKey' = '$($defaultTags[$tagKey])'" -ForegroundColor Yellow
             $tagsToApply += "$tagKey=$($defaultTags[$tagKey])"
             $needsUpdate = $true
         }
     }
 
     if ($needsUpdate) {
-        Write-Host "  Updating tags for resource..." -ForegroundColor Cyan
+        Write-Host "  Merging missing tags onto this resource..." -ForegroundColor Cyan
         $tagString = $tagsToApply -join " "
         
         # Run az resource tag merge
         $null = az resource tag --ids $resource.id --tags $tagString --operation Merge
         
-        # Verify success
+        # Confirm the merge worked
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "  Tags updated successfully!" -ForegroundColor Green
+            Write-Host "  Tags applied!" -ForegroundColor Green
         } else {
-            Write-Warning "  Failed to update tags for '$($resource.name)'."
+            Write-Warning "  Could not apply tags to '$($resource.name)'."
         }
     } else {
-        Write-Host "  Resource is already compliant with mandatory tag presence rules." -ForegroundColor Green
+        Write-Host "  This resource already has every mandatory tag." -ForegroundColor Green
     }
 }
 
 Write-Host "--------------------------------------------------" -ForegroundColor Gray
-Write-Host "Tagging process completed." -ForegroundColor Green
+Write-Host "Tagging pass finished." -ForegroundColor Green
