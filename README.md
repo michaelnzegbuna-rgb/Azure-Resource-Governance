@@ -1,144 +1,144 @@
-# Azure Resource Tags, Policies, and Governance Learning Program
+# Azure Tagging, Policy, and Governance Mini-Project
 
-This repository contains the governance framework, automated scripts, and policy definitions designed to establish cost control, security alignment, and operational compliance within an Azure environment.
-
----
-
-## Project Objectives
-
-1.  **Tagging Schema**: Define a metadata framework balancing the needs of IT, Security, and Finance.
-2.  **Resource Governance**: Implement proactive rules to deny any non-compliant deployments.
-3.  **Retroactive Compliance**: Detect and update untagged legacy resources.
-4.  **Audit & Reporting**: Monitor compliance via the Azure Policy Dashboard and query resource compliance with Azure Resource Graph (KQL).
+This repository pulls together the governance setup, the automation scripts, and the policy definitions used to bring cost control, security alignment, and compliance discipline to an Azure environment.
 
 ---
 
-## Directory Structure
+## What This Project Sets Out to Do
+
+1.  **Build a Tagging Schema**: Land on a metadata structure that works for IT, Security, and Finance all at once.
+2.  **Govern Resource Creation**: Put proactive rules in place that block any deployment falling outside the schema.
+3.  **Clean Up Existing Resources**: Find and retag legacy resources that were deployed before governance was in place.
+4.  **Track and Report Compliance**: Keep an eye on things through the Azure Policy Dashboard, and cross-check with Azure Resource Graph (KQL) queries.
+
+---
+
+## How the Repository Is Organized
 
 ```text
 AzureGovernanceMiniProject/
-├── README.md                          # Main project instructions
-├── tagging-schema.md                  # Metadata tag definitions & justifications
+├── README.md                          # Top-level project walkthrough
+├── tagging-schema.md                  # Tag definitions and the reasoning behind them
 ├── policies/
-│   ├── require-tag-and-value.json     # Custom Policy JSON definition
-│   ├── assign-policy.ps1              # PowerShell assignment script
-│   └── assign-policy.sh               # Azure CLI assignment script
+│   ├── require-tag-and-value.json     # Custom policy definition (JSON)
+│   ├── assign-policy.ps1              # Assigns the policy via PowerShell
+│   └── assign-policy.sh               # Assigns the policy via Azure CLI / Bash
 ├── scripts/
-│   ├── apply-tags.ps1                 # PowerShell manual tag applier (requires Az module)
-│   ├── apply-tags-az.ps1              # PowerShell manual tag applier (uses Azure CLI)
-│   ├── apply-tags.sh                  # Azure CLI manual tag applier (Bash)
-│   ├── deploy-test-resources.ps1      # PowerShell policy enforcement tester
-│   ├── deploy-test-resources.sh       # Azure CLI policy enforcement tester
-│   └── verify-tags.kql                # Azure Resource Graph KQL query
+│   ├── apply-tags.ps1                 # Manual tag applier — PowerShell, needs the Az module
+│   ├── apply-tags-az.ps1              # Manual tag applier — PowerShell, Azure CLI only
+│   ├── apply-tags.sh                  # Manual tag applier — Bash / Azure CLI
+│   ├── deploy-test-resources.ps1      # Tests policy enforcement — PowerShell
+│   ├── deploy-test-resources.sh       # Tests policy enforcement — Azure CLI / Bash
+│   └── verify-tags.kql                # Resource Graph query for tag verification
 ├── reports/
-│   └── verification-report.md         # Tagged resources compliance report
+│   └── verification-report.md         # Compliance report for tagged resources
 └── screenshots/
-    └── README.md                      # Instructions for mandatory screenshots
+    └── README.md                      # Notes on which screenshots are required
 ```
 
 ---
 
-## Step-by-Step Execution Guide
+## Running Through It Step by Step
 
-You can run these steps using **either** **Azure CLI** or **Azure PowerShell**. Ensure you are logged into your Azure subscription before running the scripts.
+Everything here can be done with **either Azure CLI or Azure PowerShell** — pick whichever you're more comfortable with. Make sure you're signed in to the right subscription before starting.
 
-### Step 1: Login & Select Subscription
+### Step 1: Sign In and Pick a Subscription
 
 *   **Azure CLI**:
     ```bash
     az login
-    # If you have multiple subscriptions, select your active one:
+    # If more than one subscription is available, set the one you want active:
     az account set --subscription "<subscription-name-or-id>"
     ```
 *   **Azure PowerShell**:
     ```powershell
     Connect-AzAccount
-    # If you have multiple subscriptions, set context:
+    # If more than one subscription is available, set the context:
     Set-AzContext -Subscription "<subscription-name-or-id>"
     ```
 
 ---
 
-### Step 2: Define and Assign the Azure Policy
+### Step 2: Create and Apply the Policy
 
-Deploy the custom policy to enforce tag presence and value constraints. You must target a resource scope (we recommend creating a test Resource Group).
+This deploys the custom policy that enforces both tag presence and allowed tag values. You'll need a scope to target — a dedicated test Resource Group is recommended.
 
-*   **Option A: Azure CLI** (from the `policies/` directory):
+*   **Option A: Azure CLI** (run from the `policies/` folder):
     ```bash
     chmod +x assign-policy.sh
     ./assign-policy.sh -t ResourceGroup -n "rg-governance-demo" -e Deny
     ```
-*   **Option B: Azure PowerShell** (from the `policies/` directory):
+*   **Option B: Azure PowerShell** (run from the `policies/` folder):
     ```powershell
     .\assign-policy.ps1 -ScopeType "ResourceGroup" -ScopeName "rg-governance-demo" -PolicyEffect "Deny"
     ```
 
-*Note: Azure Policy evaluation starts immediately, but it can take 10-30 minutes to propagate fully across the scope.*
+*Heads up: the policy starts evaluating right away, but full propagation across the scope can take anywhere from 10 to 30 minutes.*
 
 ---
 
-### Step 3: Test Enforcement (Deny and Allow)
+### Step 3: Confirm the Policy Actually Blocks Things
 
-Run the test scripts to verify the policy is working. The script attempts to deploy a storage account without tags (which should fail) and one with correct tags (which should succeed).
+These test scripts confirm enforcement is working — one deployment attempt has no tags (and should be rejected), and a second has the correct tags (and should go through fine).
 
-*   **Option A: Azure CLI** (from the `scripts/` directory):
+*   **Option A: Azure CLI** (run from the `scripts/` folder):
     ```bash
     chmod +x deploy-test-resources.sh
     ./deploy-test-resources.sh -g "rg-governance-demo" -l "eastus"
     ```
-*   **Option B: Azure PowerShell** (from the `scripts/` directory):
+*   **Option B: Azure PowerShell** (run from the `scripts/` folder):
     ```powershell
     .\deploy-test-resources.ps1 -ResourceGroupName "rg-governance-demo" -Location "eastus"
     ```
 
 > [!IMPORTANT]
-> **Action Required**: Take a screenshot of the failure output showing the `RequestDisallowedByPolicy` error, rename it to `deny-error.png`, and save it under the `screenshots/` directory.
+> **You'll need to do this manually**: capture a screenshot of the failed deployment showing the `RequestDisallowedByPolicy` error, save it as `deny-error.png`, and drop it into the `screenshots/` folder.
 
 ---
 
-### Step 4: Manually Apply Tags to Existing Resources
+### Step 4: Backfill Tags on Older Resources
 
-If you have legacy resources in your Resource Group that were deployed prior to policy assignment, run this script to scan and automatically attach compliant default tags.
+For any resources that were already sitting in your Resource Group before the policy was assigned, this script scans them and fills in the missing default tags automatically.
 
-*   **Option A: Azure CLI / Bash** (from the `scripts/` directory):
+*   **Option A: Azure CLI / Bash** (run from the `scripts/` folder):
     ```bash
     chmod +x apply-tags.sh
     ./apply-tags.sh -g "rg-governance-demo" -o "your-email@company.com"
     ```
-*   **Option B: Azure PowerShell (requires Az module)** (from the `scripts/` directory):
+*   **Option B: Azure PowerShell, Az module required** (run from the `scripts/` folder):
     ```powershell
     .\apply-tags.ps1 -ResourceGroupName "rg-governance-demo" -Owner "your-email@company.com"
     ```
-*   **Option C: PowerShell using Azure CLI (no Az module required)** (from the `scripts/` directory):
+*   **Option C: Azure PowerShell via CLI, no Az module needed** (run from the `scripts/` folder):
     ```powershell
     .\apply-tags-az.ps1 -ResourceGroupName "rg-governance-demo" -Owner "your-email@company.com"
     ```
 
 ---
 
-### Step 5: Verify via Azure Resource Graph
+### Step 5: Double-Check Everything via Resource Graph
 
-1.  Navigate to **Azure Resource Graph Explorer** in the Azure Portal.
-2.  Open and copy the query located in [verify-tags.kql](file:///C:/Users/duduy/OneDrive/Documents/AzureGovernanceMiniProject/scripts/verify-tags.kql).
-3.  Execute the query.
-4.  Copy the output table, and update the table in [verification-report.md](file:///C:/Users/duduy/OneDrive/Documents/AzureGovernanceMiniProject/reports/verification-report.md) with your live resources.
-
----
-
-### Step 6: Capture Compliance Dashboard
-
-1.  In the Azure Portal, search for **Policy** and click on **Compliance** in the left sidebar.
-2.  Select the assignment: `Enforce Mandatory Tags and Allowed Values Assignment`.
-3.  Take a screenshot showing the compliance rate and resource statuses, name it `compliance-dashboard.png`, and place it in the `screenshots/` directory.
+1.  Open **Azure Resource Graph Explorer** inside the Azure Portal.
+2.  Grab the query from [verify-tags.kql](file:///C:/Users/duduy/OneDrive/Documents/AzureGovernanceMiniProject/scripts/verify-tags.kql) and paste it in.
+3.  Run it.
+4.  Take the resulting table and drop it into [verification-report.md](file:///C:/Users/duduy/OneDrive/Documents/AzureGovernanceMiniProject/reports/verification-report.md), updated with your own live resources.
 
 ---
 
-## Submission Checklist
+### Step 6: Grab a Screenshot of the Compliance Dashboard
 
-Before submitting the GitHub link, ensure your repository has:
-*   [ ] Standardized [Tagging Schema Documentation](file:///C:/Users/duduy/OneDrive/Documents/AzureGovernanceMiniProject/tagging-schema.md).
-*   [ ] Exported custom policy rules: [require-tag-and-value.json](file:///C:/Users/duduy/OneDrive/Documents/AzureGovernanceMiniProject/policies/require-tag-and-value.json).
-*   [ ] Completed [Verification Report](file:///C:/Users/duduy/OneDrive/Documents/AzureGovernanceMiniProject/reports/verification-report.md) reflecting your active resources.
-*   [ ] Screenshots folder containing:
+1.  In the Azure Portal, search for **Policy**, then click **Compliance** in the sidebar.
+2.  Open the assignment named `Enforce Mandatory Tags and Allowed Values Assignment`.
+3.  Screenshot the compliance rate and resource statuses, save it as `compliance-dashboard.png`, and place it in the `screenshots/` folder.
+
+---
+
+## Before You Submit
+
+Double-check your repo includes:
+*   [ ] A complete [Tagging Schema write-up](file:///C:/Users/duduy/OneDrive/Documents/AzureGovernanceMiniProject/tagging-schema.md)
+*   [ ] The exported policy definition: [require-tag-and-value.json](file:///C:/Users/duduy/OneDrive/Documents/AzureGovernanceMiniProject/policies/require-tag-and-value.json)
+*   [ ] A finished [Verification Report](file:///C:/Users/duduy/OneDrive/Documents/AzureGovernanceMiniProject/reports/verification-report.md) reflecting your actual resources
+*   [ ] A screenshots folder containing:
     *   `screenshots/deny-error.png`
     *   `screenshots/compliance-dashboard.png`
