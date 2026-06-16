@@ -1,9 +1,7 @@
 #!/bin/bash
-
-# SYNOPSIS: Deploys and assigns the custom Azure Policy definition to enforce resource tagging using Azure CLI.
+# SYNOPSIS: Registers and assigns the custom Azure Policy definition that enforces resource tagging, using the Azure CLI.
 # USAGE: ./assign-policy.sh -t <ScopeType> -n <ScopeName> -e <PolicyEffect>
 # EXAMPLE: ./assign-policy.sh -t ResourceGroup -n rg-governance-demo -e Deny
-
 set -e
 
 # Default parameters
@@ -13,9 +11,9 @@ POLICY_EFFECT="Deny"
 
 print_usage() {
     echo "Usage: ./assign-policy.sh -t [ResourceGroup|Subscription] -n [ScopeName/SubId] -e [Audit|Deny]"
-    echo "  -t : Scope type (default: ResourceGroup)"
-    echo "  -n : Scope Name (Resource Group name or Subscription ID)"
-    echo "  -e : Policy Effect (default: Deny)"
+    echo "  -t : Scope type (defaults to ResourceGroup)"
+    echo "  -n : Scope name (Resource Group name or Subscription ID)"
+    echo "  -e : Policy effect (defaults to Deny)"
 }
 
 while getopts "t:n:e:h" opt; do
@@ -29,35 +27,34 @@ while getopts "t:n:e:h" opt; do
 done
 
 if [ -z "$SCOPE_NAME" ]; then
-    echo "Error: Scope Name (-n) is required."
+    echo "Error: a scope name (-n) must be provided."
     print_usage
     exit 1
 fi
 
-# Ensure logged in
-echo "Checking Azure CLI login status..."
+# Confirm an active Azure session exists
+echo "Checking current Azure CLI session..."
 if ! az account show &> /dev/null; then
-    echo "Error: Not logged in to Azure. Please run 'az login' first."
+    echo "Error: no active Azure session found. Run 'az login' before retrying."
     exit 1
 fi
 
 POLICY_RULES_FILE="require-tag-and-value-rules.json"
 POLICY_PARAMS_FILE="require-tag-and-value-params.json"
 if [ ! -f "$POLICY_RULES_FILE" ]; then
-    # Check in subfolder relative to script
+    # Fall back to looking relative to the script's own directory
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     POLICY_RULES_FILE="$SCRIPT_DIR/require-tag-and-value-rules.json"
     POLICY_PARAMS_FILE="$SCRIPT_DIR/require-tag-and-value-params.json"
     if [ ! -f "$POLICY_RULES_FILE" ]; then
-        echo "Error: Policy files not found."
+        echo "Error: couldn't locate the policy definition files."
         exit 1
     fi
 fi
 
-# 1. Create or Update Policy Definition
+# 1. Register the policy definition
 DEFINITION_NAME="Enforce-Mandatory-Tags-And-Values"
-echo "Creating/Updating custom policy definition '$DEFINITION_NAME'..."
-
+echo "Registering custom policy definition '$DEFINITION_NAME'..."
 az policy definition create \
     --name "$DEFINITION_NAME" \
     --display-name "Enforce Mandatory Tags and Allowed Values" \
@@ -66,36 +63,34 @@ az policy definition create \
     --params "$POLICY_PARAMS_FILE" \
     --mode Indexed \
     --metadata "category=Tags"
+echo "Policy definition is registered and up to date."
 
-echo "Policy definition created successfully."
-
-# 2. Determine Scope Resource ID
+# 2. Resolve the target scope's resource ID
 SCOPE_ID=""
 if [ "$SCOPE_TYPE" == "ResourceGroup" ]; then
-    echo "Validating Resource Group '$SCOPE_NAME'..."
+    echo "Confirming Resource Group '$SCOPE_NAME' exists..."
     if ! az group show --name "$SCOPE_NAME" &> /dev/null; then
-        echo "Error: Resource Group '$SCOPE_NAME' does not exist."
+        echo "Error: Resource Group '$SCOPE_NAME' could not be found."
         exit 1
     fi
     SCOPE_ID=$(az group show --name "$SCOPE_NAME" --query id -o tsv)
-    echo "Scope resolved to: $SCOPE_ID"
+    echo "Target scope resolved to: $SCOPE_ID"
 elif [ "$SCOPE_TYPE" == "Subscription" ]; then
-    echo "Validating Subscription ID '$SCOPE_NAME'..."
+    echo "Confirming access to Subscription '$SCOPE_NAME'..."
     if ! az account set --subscription "$SCOPE_NAME" &> /dev/null; then
-        echo "Error: Subscription ID '$SCOPE_NAME' not found or not accessible."
+        echo "Error: Subscription '$SCOPE_NAME' was not found or you don't have access to it."
         exit 1
     fi
     SCOPE_ID="/subscriptions/$SCOPE_NAME"
-    echo "Scope resolved to: $SCOPE_ID"
+    echo "Target scope resolved to: $SCOPE_ID"
 else
-    echo "Error: Invalid Scope Type. Use 'ResourceGroup' or 'Subscription'."
+    echo "Error: invalid scope type — use 'ResourceGroup' or 'Subscription'."
     exit 1
 fi
 
-# 3. Create Policy Assignment
+# 3. Create the policy assignment
 ASSIGNMENT_NAME="Assign-Enforce-Tags"
-echo "Assigning policy to scope with effect '$POLICY_EFFECT'..."
-
+echo "Applying policy to the target scope with effect '$POLICY_EFFECT'..."
 az policy assignment create \
     --name "$ASSIGNMENT_NAME" \
     --display-name "Enforce Mandatory Tags and Allowed Values Assignment" \
@@ -103,7 +98,7 @@ az policy assignment create \
     --scope "$SCOPE_ID" \
     --params "{\"effect\": {\"value\": \"$POLICY_EFFECT\"}}"
 
-echo "Policy assigned successfully!"
+echo "Policy assignment complete!"
 echo "Assignment Name: $ASSIGNMENT_NAME"
 echo "Assignment Scope: $SCOPE_ID"
-echo "Note: It may take 10-30 minutes for the policy assignment to take full effect in Azure."
+echo "Note: Azure may take 10-30 minutes to fully apply this assignment."
